@@ -3,36 +3,26 @@ import {
   MessageBody,
   SubscribeMessage,
   WebSocketGateway,
-  WebSocketServer,
 } from '@nestjs/websockets';
+import { Socket } from 'socket.io';
 
-@WebSocketGateway(81, { namespace: 'chat' })
+@WebSocketGateway(6974, { namespace: 'chat', cors: true })
 export class ChatGateway {
-  @WebSocketServer()
-  server;
-
-  wsClients = [];
-
-  @SubscribeMessage('hihi')
-  connectSomeone(@MessageBody() data: string, @ConnectedSocket() client) {
-    const [nickname, room] = data.split('|');
-    console.log(`${nickname}님이 코드: ${room}방에 접속했습니다.`);
-    const comeOn = `${nickname}님이 입장했습니다.`;
-    this.server.emit('comeOn' + room, comeOn);
-    this.wsClients.push(client);
-  }
-
-  private broadcast(event, client, message: any) {
-    for (const c of this.wsClients) {
-      if (client.id == c.id) continue;
-      c.emit(event, message);
-    }
+  @SubscribeMessage('join')
+  handleJoin(@ConnectedSocket() client: Socket, @MessageBody() roomId: string) {
+    console.log(roomId);
+    client.join(roomId);
   }
 
   @SubscribeMessage('send')
-  sendMessage(@MessageBody() data: string, @ConnectedSocket() client) {
-    const [room, nickname, message] = data;
-    console.log(`${client.id} : ${data}`);
-    this.broadcast('send' + room, client, [nickname, message]);
+  handleSend(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId: string; message: string; nickName: string },
+  ) {
+    client.to(data.roomId).emit('message', {
+      nickName: data.nickName,
+      message: data.message,
+      roomId: data.roomId,
+    });
   }
 }
